@@ -7,7 +7,7 @@ from collections.abc import Iterable, Sequence
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any
 
-from . import api_jws
+from .api_jws import PyJWS, _jws_global_obj
 from .exceptions import (
     DecodeError,
     ExpiredSignatureError,
@@ -32,6 +32,8 @@ class PyJWT:
             options = {}
         self.options: dict[str, Any] = {**self._get_default_options(), **options}
 
+        self._jws = PyJWS(options=self._get_sig_options())
+
     @staticmethod
     def _get_default_options() -> dict[str, bool | list[str]]:
         return {
@@ -44,6 +46,15 @@ class PyJWT:
             "verify_sub": True,
             "verify_jti": True,
             "require": [],
+            "enforce_minimum_key_length": False,
+        }
+
+    def _get_sig_options(self) -> dict[str, Any]:
+        return {
+            "verify_signature": self.options["verify_signature"],
+            "enforce_minimum_key_length": self.options.get(
+                "enforce_minimum_key_length", False
+            ),
         }
 
     def encode(
@@ -75,7 +86,7 @@ class PyJWT:
             json_encoder=json_encoder,
         )
 
-        return api_jws.encode(
+        return self._jws.encode(
             json_payload,
             key,
             algorithm,
@@ -153,7 +164,7 @@ class PyJWT:
             options.setdefault("verify_sub", False)
             options.setdefault("verify_jti", False)
 
-        decoded = api_jws.decode_complete(
+        decoded = self._jws.decode_complete(
             jwt,
             key=key,
             algorithms=algorithms,
@@ -428,6 +439,7 @@ class PyJWT:
 
 
 _jwt_global_obj = PyJWT()
+_jwt_global_obj._jws = _jws_global_obj
 encode = _jwt_global_obj.encode
 decode_complete = _jwt_global_obj.decode_complete
 decode = _jwt_global_obj.decode
