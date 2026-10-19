@@ -16,6 +16,7 @@ from jwt.exceptions import (
     InvalidIssuerError,
     InvalidJTIError,
     InvalidSubjectError,
+    InvalidTokenError,
     MissingRequiredClaimError,
 )
 from jwt.utils import base64url_decode
@@ -942,4 +943,20 @@ class TestJWT:
         token = jwt.encode(payload, secret, algorithm="HS256")
 
         with pytest.raises(InvalidJTIError):
+            jwt.decode(token, secret, algorithms=["HS256"])
+
+    # -------------------- Crit Header Tests --------------------
+
+    def test_decode_rejects_token_with_unknown_crit_extension(self, jwt):
+        """RFC 7515 Section 4.1.11: tokens with unsupported critical extensions MUST be rejected."""
+        secret = "secret"
+        payload = {"sub": "attacker", "role": "admin"}
+        token = jwt.encode(
+            payload,
+            secret,
+            algorithm="HS256",
+            headers={"crit": ["x-custom-policy"], "x-custom-policy": "require-mfa"},
+        )
+
+        with pytest.raises(InvalidTokenError, match="Unsupported critical extension"):
             jwt.decode(token, secret, algorithms=["HS256"])
